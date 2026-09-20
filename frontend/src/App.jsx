@@ -25,9 +25,20 @@ if(typeof document !== "undefined") {
 // LOCAL ADMIN API: localhost/127.0.0.1 uses the local backend on port 5000.
 const resolveImageUrl=(url)=>{
   if(!url) return '';
-  if(/^https?:\/\//i.test(url)){
-    return url.replace('http://127.0.0.1:5000', API_BASE).replace('http://localhost:5000', API_BASE);
+
+  // Images stored in frontend/public are served directly by Vercel/Vite.
+  // Do NOT prefix these paths with the backend API URL.
+  if(url.startsWith('/company-gallery/')){
+    return url;
   }
+
+  // Backend-uploaded images are served from the API.
+  if(/^https?:\/\//i.test(url)){
+    return url
+      .replace('http://127.0.0.1:5000', API_BASE)
+      .replace('http://localhost:5000', API_BASE);
+  }
+
   return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
