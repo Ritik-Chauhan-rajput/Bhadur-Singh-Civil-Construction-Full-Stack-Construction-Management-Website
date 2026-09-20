@@ -19,46 +19,64 @@ app.set("trust proxy", 1);
 // CORS
 // ===============================
 
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean)
-  : [];
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:5175",
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests without Origin header
-      if (!origin) {
-        return callback(null, true);
-      }
+  // Production frontend
+  "https://bsc-civil-construction.vercel.app",
+];
 
-      // Local development
-      const isLocalOrigin =
-        origin === "http://localhost:5173" ||
-        origin === "http://localhost:5174" ||
-        origin === "http://localhost:5175" ||
-        origin === "http://127.0.0.1:5173" ||
-        origin === "http://127.0.0.1:5174" ||
-        origin === "http://127.0.0.1:5175";
+// Optional additional origins from environment variable
+if (process.env.FRONTEND_URL) {
+  const envOrigins = process.env.FRONTEND_URL
+    .split(",")
+    .map((value) => value.trim().replace(/\/$/, ""))
+    .filter(Boolean);
 
-      // Production frontend
-      if (isLocalOrigin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+  envOrigins.forEach((origin) => {
+    if (!allowedOrigins.includes(origin)) {
+      allowedOrigins.push(origin);
+    }
+  });
+}
 
-      return callback(new Error("CORS origin not allowed"));
-    },
+console.log("Allowed CORS origins:", allowedOrigins);
 
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests without Origin header
+    if (!origin) {
+      return callback(null, true);
+    }
 
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
-  })
-);
+    const cleanOrigin = origin.replace(/\/$/, "");
+
+    if (allowedOrigins.includes(cleanOrigin)) {
+      return callback(null, true);
+    }
+
+    console.log("CORS blocked origin:", origin);
+
+    return callback(new Error("CORS origin not allowed"));
+  },
+
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+  ],
+
+  optionsSuccessStatus: 204,
+};
+
+// CORS middleware
+app.use(cors(corsOptions));
 
 // ===============================
 // JSON BODY
@@ -130,7 +148,6 @@ app.use((error, req, res, next) => {
 // ===============================
 
 const PORT = process.env.PORT || 5000;
-
 const HOST = "0.0.0.0";
 
 // ===============================
