@@ -2,8 +2,16 @@ import {useEffect,useState} from 'react';
 import {BrowserRouter,Routes,Route,Link,useNavigate,Navigate} from 'react-router-dom';
 import './App.css';
 
-const API=(import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api').replace(/\/$/,'');
+const API = (
+  (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+  )
+    ? "http://127.0.0.1:5000/api"
+    : (import.meta.env.VITE_API_URL || "https://bsc-civil-construction-api.onrender.com/api")
+).replace(/\/$/, "");
 const API_BASE=API.replace(/\/api\/?$/,'');
+// LOCAL ADMIN API: localhost/127.0.0.1 uses the local backend on port 5000.
 const resolveImageUrl=(url)=>{
   if(!url) return '';
   if(/^https?:\/\//i.test(url)){
@@ -153,22 +161,12 @@ useEffect(()=>{Promise.all(['services','projects','gallery','testimonials'].map(
   <div className="about-premium-grid">
     <div className="about-visual">
       <div className="about-photo-card">
-        {(gallery[0]?.image || projects[0]?.image) ? (
-  <img
-    src={resolveImageUrl(gallery[0]?.image || projects[0]?.image)}
-    alt="BSC Civil Contractor work"
-    onError={(e) => {
-      e.currentTarget.style.display = "none";
-    }}
-  />
-) : (
-  <div className="about-image-placeholder" aria-label="BSC Civil Contractor work">
-    BSC CIVIL CONTRACTOR
-  </div>
-)}
-          <strong>10+</strong>
-          <span>Years of<br/>Experience</span>
-        </div>
+        <img
+          src="/company-gallery/Work.png"
+          alt="BSC Civil Contractor Work"
+        />
+        <strong>10+</strong>
+        <span>Years of<br/>Experience</span>
       </div>
       <div className="about-mini-card">
         <span className="about-mini-icon">🏗️</span>
@@ -400,9 +398,94 @@ useEffect(()=>{Promise.all(['services','projects','gallery','testimonials'].map(
   <button className="back-to-top" type="button" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="Back to top">↑</button>
 }</>}
 
-function Login(){const nav=useNavigate();const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [err,setErr]=useState('');const submit=async e=>{e.preventDefault();setErr('');try{const r=await fetch(`${API}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const d=await r.json();if(!r.ok)return setErr(d.message||'Login failed');localStorage.setItem('adminToken',d.token);localStorage.setItem('admin',JSON.stringify(d.admin));nav('/admin/dashboard');}catch{setErr('Unable to connect to server.')}};return <div className="login-page"><form className="login-card" onSubmit={submit}><div className="brand-mark big">BSC</div><h1>Admin Login</h1><p>Manage enquiries, projects, gallery and website content.</p><input required type="email" placeholder="Admin email" value={email} onChange={e=>setEmail(e.target.value)}/><input required type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)}/>{err&&<div className="error">{err}</div>}<button className="btn btn-primary">Login</button><Link to="/">← Back to website</Link></form></div>}
+function Login(){
+  const nav=useNavigate();
+  const [email,setEmail]=useState('');
+  const [password,setPassword]=useState('');
+  const [err,setErr]=useState('');
+  const [loading,setLoading]=useState(false);
+
+  const submit=async e=>{
+    e.preventDefault();
+    setErr('');
+
+    const cleanEmail=email.trim();
+
+    if(!cleanEmail || !password){
+      setErr('Please enter email and password.');
+      return;
+    }
+
+    try{
+      setLoading(true);
+
+      const d=await apiJson(`${API}/auth/login`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          email:cleanEmail,
+          password
+        })
+      });
+
+      if(!d?.token){
+        throw new Error('Login response did not contain an authentication token.');
+      }
+
+      try{
+        localStorage.setItem('adminToken',d.token);
+        localStorage.setItem('admin',JSON.stringify(d.admin||{}));
+      }catch(storageError){
+        console.error('Local storage error:',storageError);
+        setErr('Login successful, but browser storage is blocked. Please allow site storage and try again.');
+        return;
+      }
+
+      nav('/admin/dashboard',{replace:true});
+    }catch(error){
+      console.error('Admin login error:',error);
+      setErr(error?.message || 'Login failed. Please try again.');
+    }finally{
+      setLoading(false);
+    }
+  };
+
+  return <div className="login-page">
+    <form className="login-card" onSubmit={submit}>
+      <div className="brand-mark big">BSC</div>
+      <h1>Admin Login</h1>
+      <p>Manage enquiries, projects, gallery and website content.</p>
+
+      <input
+        required
+        type="email"
+        placeholder="Admin email"
+        value={email}
+        onChange={e=>setEmail(e.target.value)}
+        autoComplete="username"
+      />
+
+      <input
+        required
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={e=>setPassword(e.target.value)}
+        autoComplete="current-password"
+      />
+
+      {err&&<div className="error">{err}</div>}
+
+      <button className="btn btn-primary" type="submit" disabled={loading}>
+        {loading ? 'Signing in...' : 'Login'}
+      </button>
+
+      <Link to="/">← Back to website</Link>
+    </form>
+  </div>
+}
 function Protected({children}){return localStorage.getItem('adminToken')?children:<Navigate to="/admin/login" replace/>}
-function Sidebar(){const nav=useNavigate();return <aside className="admin-side"><div className="brand"><div className="brand-mark">BSC</div><div><strong>BSC CIVIL</strong><span>Admin Panel</span></div></div><nav><Link to="/admin/dashboard">📊 Dashboard</Link><Link to="/admin/enquiries">📩 Enquiries</Link><Link to="/admin/projects">🏗️ Projects</Link><Link to="/admin/gallery">🖼️ Gallery</Link><Link to="/admin/services">🛠️ Services</Link><Link to="/admin/testimonials">⭐ Testimonials</Link></nav><button className="logout" onClick={()=>{localStorage.clear();nav('/admin/login')}}>Logout</button></aside>}
+function Sidebar(){const nav=useNavigate();return <aside className="admin-side"><div className="brand"><div className="brand-mark">BSC</div><div><strong>BSC CIVIL</strong><span>Admin Panel</span></div></div><nav><Link to="/admin/dashboard">📊 Dashboard</Link><Link to="/admin/enquiries">📩 Enquiries</Link><Link to="/admin/projects">🏗️ Projects</Link><Link to="/admin/gallery">🖼️ Gallery</Link><Link to="/admin/services">🛠️ Services</Link><Link to="/admin/testimonials">⭐ Testimonials</Link><Link to="/admin/settings">⚙️ Settings</Link></nav><button className="logout" onClick={()=>{localStorage.clear();nav('/admin/login')}}>Logout</button></aside>}
 function AdminLayout({children,title}){return <div className="admin-layout"><Sidebar/><main className="admin-main"><div className="admin-top"><div><small>ADMIN PANEL</small><h1>{title}</h1></div><Link to="/" target="_blank">View Website ↗</Link></div>{children}</main></div>}
 function Dashboard(){
   const [data,setData]=useState({
@@ -692,6 +775,199 @@ function Enquiries(){
 }
 
 
+
+function AdminSettings(){
+  const navigate=useNavigate();
+  const [admin,setAdmin]=useState({name:"",email:""});
+  const [currentPassword,setCurrentPassword]=useState("");
+  const [newPassword,setNewPassword]=useState("");
+  const [confirmPassword,setConfirmPassword]=useState("");
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+  const [message,setMessage]=useState("");
+  const [error,setError]=useState("");
+
+  useEffect(()=>{
+    const loadAdmin=async()=>{
+      try{
+        const token=localStorage.getItem("adminToken");
+        if(!token){navigate("/admin/login");return;}
+
+        const response=await fetch(`${API}/auth/me`,{
+          headers:{Authorization:`Bearer ${token}`}
+        });
+        const data=await response.json();
+
+        if(!response.ok){
+          localStorage.removeItem("adminToken");
+          localStorage.removeItem("admin");
+          navigate("/admin/login");
+          return;
+        }
+
+        setAdmin({
+          name:data.admin?.name||"",
+          email:data.admin?.email||""
+        });
+      }catch(err){
+        setError("Unable to load admin details.");
+      }finally{
+        setLoading(false);
+      }
+    };
+
+    loadAdmin();
+  },[navigate]);
+
+  const handleSubmit=async e=>{
+    e.preventDefault();
+    setMessage("");
+    setError("");
+
+    if(!currentPassword){
+      setError("Current password is required.");
+      return;
+    }
+
+    if(newPassword && newPassword.length<8){
+      setError("New password must be at least 8 characters.");
+      return;
+    }
+
+    if(newPassword!==confirmPassword){
+      setError("New passwords do not match.");
+      return;
+    }
+
+    try{
+      setSaving(true);
+
+      const token=localStorage.getItem("adminToken");
+      const response=await fetch(`${API}/auth/settings`,{
+        method:"PUT",
+        headers:{
+          "Content-Type":"application/json",
+          Authorization:`Bearer ${token}`
+        },
+        body:JSON.stringify({
+          name:admin.name,
+          email:admin.email,
+          currentPassword,
+          newPassword
+        })
+      });
+
+      const data=await response.json();
+
+      if(!response.ok){
+        setError(data.message||"Failed to update settings.");
+        return;
+      }
+
+      localStorage.setItem("adminToken",data.token);
+      localStorage.setItem("admin",JSON.stringify(data.admin));
+
+      setAdmin({
+        name:data.admin.name,
+        email:data.admin.email
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage("Admin settings updated successfully.");
+    }catch(err){
+      setError("Unable to connect to server.");
+    }finally{
+      setSaving(false);
+    }
+  };
+
+  if(loading){
+    return <AdminLayout title="Settings"><div className="admin-note"><h3>Loading Settings...</h3></div></AdminLayout>;
+  }
+
+  return <AdminLayout title="Settings">
+    <div className="settings-card">
+      <div className="settings-section">
+        <span className="settings-kicker">ACCOUNT SETTINGS</span>
+        <h2>Administrator Account</h2>
+        <p className="settings-help">Update the name and email used for your admin account.</p>
+
+        <label>
+          Admin Name
+          <input
+            type="text"
+            value={admin.name}
+            onChange={e=>setAdmin({...admin,name:e.target.value})}
+            placeholder="Admin name"
+            required
+          />
+        </label>
+
+        <label>
+          Login Email
+          <input
+            type="email"
+            value={admin.email}
+            onChange={e=>setAdmin({...admin,email:e.target.value})}
+            placeholder="Admin email"
+            required
+          />
+        </label>
+      </div>
+
+      <div className="settings-section">
+        <span className="settings-kicker">SECURITY</span>
+        <h2>Change Password</h2>
+        <p className="settings-help">Enter your current password to confirm any account change.</p>
+
+        <label>
+          Current Password
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={e=>setCurrentPassword(e.target.value)}
+            placeholder="Enter current password"
+            required
+          />
+        </label>
+
+        <label>
+          New Password
+          <input
+            type="password"
+            value={newPassword}
+            onChange={e=>setNewPassword(e.target.value)}
+            placeholder="Leave empty to keep current password"
+          />
+        </label>
+
+        <label>
+          Confirm New Password
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={e=>setConfirmPassword(e.target.value)}
+            placeholder="Confirm new password"
+          />
+        </label>
+      </div>
+
+      {error&&<div className="settings-error">{error}</div>}
+      {message&&<div className="settings-success">{message}</div>}
+
+      <button
+        className="primary-btn"
+        type="button"
+        onClick={handleSubmit}
+        disabled={saving}
+      >
+        {saving?"Saving...":"Save Changes"}
+      </button>
+    </div>
+  </AdminLayout>
+}
+
 function Manager({ type, title, fields, defaults }) {
   const [items,setItems]=useState([]);
   const [form,setForm]=useState(defaults);
@@ -896,6 +1172,6 @@ function Manager({ type, title, fields, defaults }) {
     </div>
   </AdminLayout>
 }
-function App(){return <BrowserRouter><Routes><Route path="/" element={<Home/>}/><Route path="/admin/login" element={<Login/>}/><Route path="/admin/dashboard" element={<Protected><Dashboard/></Protected>}/><Route path="/admin/enquiries" element={<Protected><Enquiries/></Protected>}/><Route path="/admin/projects" element={<Protected><Manager type="projects" title="Projects" fields={['title','category','location','description','image']} defaults={{title:'',category:'',location:'',description:'',image:''}}/></Protected>}/><Route path="/admin/gallery" element={<Protected><Manager type="gallery" title="Gallery" fields={['title','category','image']} defaults={{title:'',category:'',image:''}}/></Protected>}/><Route path="/admin/services" element={<Protected><Manager type="services" title="Services" fields={['title','description','icon']} defaults={{title:'',description:'',icon:'🏗️'}}/></Protected>}/><Route path="/admin/testimonials" element={<Protected><Manager type="testimonials" title="Testimonials" fields={['name','role','message','rating']} defaults={{name:'',role:'',message:'',rating:5}}/></Protected>}/></Routes></BrowserRouter>}
+function App(){return <BrowserRouter><Routes><Route path="/" element={<Home/>}/><Route path="/admin/login" element={<Login/>}/><Route path="/admin/dashboard" element={<Protected><Dashboard/></Protected>}/><Route path="/admin/enquiries" element={<Protected><Enquiries/></Protected>}/><Route path="/admin/projects" element={<Protected><Manager type="projects" title="Projects" fields={['title','category','location','description','image']} defaults={{title:'',category:'',location:'',description:'',image:''}}/></Protected>}/><Route path="/admin/gallery" element={<Protected><Manager type="gallery" title="Gallery" fields={['title','category','image']} defaults={{title:'',category:'',image:''}}/></Protected>}/><Route path="/admin/services" element={<Protected><Manager type="services" title="Services" fields={['title','description','icon']} defaults={{title:'',description:'',icon:'🏗️'}}/></Protected>}/><Route path="/admin/testimonials" element={<Protected><Manager type="testimonials" title="Testimonials" fields={['name','role','message','rating']} defaults={{name:'',role:'',message:'',rating:5}}/></Protected>}/><Route path="/admin/settings" element={<Protected><AdminSettings/></Protected>}/></Routes></BrowserRouter>}
 export default App;
 
