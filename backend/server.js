@@ -15,24 +15,67 @@ const app = express();
 
 app.set("trust proxy", 1);
 
+// ===============================
 // CORS
+// ===============================
+
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+  : [];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL
-      ? process.env.FRONTEND_URL.split(",").map((v) => v.trim())
-      : true,
-    methods: ["GET", "POST", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: (origin, callback) => {
+      // Allow requests without Origin header
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Local development
+      const isLocalOrigin =
+        origin === "http://localhost:5173" ||
+        origin === "http://localhost:5174" ||
+        origin === "http://localhost:5175" ||
+        origin === "http://127.0.0.1:5173" ||
+        origin === "http://127.0.0.1:5174" ||
+        origin === "http://127.0.0.1:5175";
+
+      // Production frontend
+      if (isLocalOrigin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("CORS origin not allowed"));
+    },
+
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   })
 );
 
-// JSON
-app.use(express.json());
+// ===============================
+// JSON BODY
+// ===============================
 
-// Static uploads
+app.use(express.json({ limit: "1mb" }));
+
+// ===============================
+// STATIC UPLOADS
+// ===============================
+
 app.use("/uploads", express.static("uploads"));
 
-// Test route
+// ===============================
+// HEALTH CHECK
+// ===============================
+
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -40,20 +83,60 @@ app.get("/", (req, res) => {
   });
 });
 
-// API routes
+// ===============================
+// API ROUTES
+// ===============================
+
 app.use("/api/enquiries", enquiryRoutes);
+
 app.use("/api/auth", authRoutes);
+
 app.use("/api/upload", uploadRoutes);
+
 app.use("/api/gallery", galleryRoutes);
+
 app.use("/api/projects", projectRoutes);
+
 app.use("/api/services", serviceRoutes);
+
 app.use("/api/testimonials", testimonialRoutes);
 
-// Server configuration
+// ===============================
+// ERROR HANDLER
+// ===============================
+
+app.use((error, req, res, next) => {
+  if (error && error.message === "CORS origin not allowed") {
+    return res.status(403).json({
+      success: false,
+      message: "CORS origin not allowed",
+    });
+  }
+
+  if (error) {
+    console.error("Request error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+
+  next();
+});
+
+// ===============================
+// SERVER
+// ===============================
+
 const PORT = process.env.PORT || 5000;
+
 const HOST = "0.0.0.0";
 
-// Start server
+// ===============================
+// START SERVER
+// ===============================
+
 async function startServer() {
   try {
     console.log("Connecting to MongoDB...");
@@ -76,7 +159,9 @@ async function startServer() {
       console.error(error);
 
       if (error.code === "EADDRINUSE") {
-        console.error(`Port ${PORT} is already being used.`);
+        console.error(
+          `Port ${PORT} is already being used.`
+        );
       }
     });
 

@@ -11,6 +11,17 @@ const API = (
     : (import.meta.env.VITE_API_URL || "https://bsc-civil-construction-api.onrender.com/api")
 ).replace(/\/$/, "");
 const API_BASE=API.replace(/\/api\/?$/,'');
+
+if(typeof document !== "undefined") {
+  document.title = "Bhadur Singh Civil Construction | Road & Civil Contractor";
+  const setMeta=(name,content)=>{
+    let el=document.querySelector(`meta[name="${name}"]`);
+    if(!el){el=document.createElement("meta");el.name=name;document.head.appendChild(el);}
+    el.content=content;
+  };
+  setMeta("description","Bhadur Singh Civil Construction provides road construction, bridges, RCC drains, precast box culverts, PSC & RCC girder and related civil infrastructure work in Khurja, Uttar Pradesh.");
+  setMeta("robots","index,follow");
+}
 // LOCAL ADMIN API: localhost/127.0.0.1 uses the local backend on port 5000.
 const resolveImageUrl=(url)=>{
   if(!url) return '';
@@ -1003,7 +1014,9 @@ function Manager({ type, title, fields, defaults }) {
     if(!imageFile)throw new Error("Please select an image");
     const imageData=new FormData();
     imageData.append("image",imageFile);
-    const response=await fetch(`${API}/upload`,{method:"POST",body:imageData});
+    const token=localStorage.getItem("adminToken");
+    if(!token)throw new Error("Authentication required. Please login again.");
+    const response=await fetch(`${API}/upload`,{method:"POST",headers:{Authorization:`Bearer ${token}`},body:imageData});
     const responseText=await response.text();
     let data;
     try{data=JSON.parse(responseText)}catch{throw new Error("Server returned an invalid response")}
