@@ -13,6 +13,24 @@ const resolveImageUrl=(url)=>{
 };
 
 
+async function apiJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const raw = await response.text();
+
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new Error(`Server returned an invalid response (${response.status})`);
+  }
+
+  if (!response.ok) {
+    throw new Error(data.message || `Request failed (${response.status})`);
+  }
+
+  return data;
+}
+
 const companyInfo = {
   phonePrimary: '8233252551',
   phoneSecondary: '7302415956',
@@ -135,8 +153,19 @@ useEffect(()=>{Promise.all(['services','projects','gallery','testimonials'].map(
   <div className="about-premium-grid">
     <div className="about-visual">
       <div className="about-photo-card">
-        <img src={gallery[0]?.image || projects[0]?.image || "/placeholder.jpg"} alt="BSC Civil Contractor work"/>
-        <div className="about-experience-badge">
+        {(gallery[0]?.image || projects[0]?.image) ? (
+  <img
+    src={resolveImageUrl(gallery[0]?.image || projects[0]?.image)}
+    alt="BSC Civil Contractor work"
+    onError={(e) => {
+      e.currentTarget.style.display = "none";
+    }}
+  />
+) : (
+  <div className="about-image-placeholder" aria-label="BSC Civil Contractor work">
+    BSC CIVIL CONTRACTOR
+  </div>
+)}
           <strong>10+</strong>
           <span>Years of<br/>Experience</span>
         </div>
@@ -225,8 +254,8 @@ useEffect(()=>{Promise.all(['services','projects','gallery','testimonials'].map(
     </div>
   }
 </section>
-<section id="projects" className="section tinted"><div className="section-head"><span>WORK PORTFOLIO</span><h2>Selected work and site activities.</h2></div><div className="project-grid">{projects.map(p=><article className="project-card project-card-enhanced" key={p._id}><div className="project-image-wrap"><img src={resolveImageUrl(p.image)} alt={p.title}/><div className="project-image-overlay"><button type="button" onClick={()=>setSelectedProject(p)}>View Details</button></div></div><div className="project-card-body"><span className="project-category">{p.category}</span><h3>{p.title}</h3><p>{p.description}</p><button type="button" className="project-details-btn" onClick={()=>setSelectedProject(p)}>View Project →</button></div></article>)}</div>{selectedProject&&<div className="project-modal" onClick={()=>setSelectedProject(null)}><div className="project-modal-card" onClick={e=>e.stopPropagation()}><button className="project-modal-close" type="button" onClick={()=>setSelectedProject(null)} aria-label="Close project details">✕</button><img src={selectedProject.image} alt={selectedProject.title}/><div className="project-modal-body"><span className="project-category">{selectedProject.category}</span><h2>{selectedProject.title}</h2><p>{selectedProject.description||'Civil construction work executed by BSC Civil Contractor.'}</p>{selectedProject.location&&<p className="project-location">📍 {selectedProject.location}</p>}<a className="btn btn-primary" href="#contact" onClick={()=>setSelectedProject(null)}>Discuss Similar Work</a></div></div></div>}</section>
-<section id="gallery" className="section"><div className="section-head"><span>SITE GALLERY</span><h2>Actual work photographs from the company profile.</h2></div><div className="gallery-grid">{gallery.map((g,index)=><figure key={g._id} onClick={()=>setSelectedImage(index)} style={{cursor:'pointer'}}><img src={resolveImageUrl(g.image)} alt={g.title}/><figcaption><b>{g.title}</b><small>{g.category}</small></figcaption></figure>)}</div>{selectedImage!==null&&gallery[selectedImage]&&<div className="gallery-lightbox" onClick={()=>setSelectedImage(null)}><button className="lightbox-close" onClick={()=>setSelectedImage(null)} aria-label="Close gallery">✕</button><button className="lightbox-prev" onClick={e=>{e.stopPropagation();setSelectedImage(selectedImage===0?gallery.length-1:selectedImage-1)}} aria-label="Previous image">‹</button><div className="lightbox-content" onClick={e=>e.stopPropagation()}><img src={gallery[selectedImage].image} alt={gallery[selectedImage].title}/><div className="lightbox-caption"><strong>{gallery[selectedImage].title}</strong><span>{gallery[selectedImage].category}</span></div></div><button className="lightbox-next" onClick={e=>{e.stopPropagation();setSelectedImage(selectedImage===gallery.length-1?0:selectedImage+1)}} aria-label="Next image">›</button></div>}</section>
+<section id="projects" className="section tinted"><div className="section-head"><span>WORK PORTFOLIO</span><h2>Selected work and site activities.</h2></div><div className="project-grid">{projects.map(p=><article className="project-card project-card-enhanced" key={p._id}><div className="project-image-wrap"><img src={resolveImageUrl(p.image)} alt={p.title}/><div className="project-image-overlay"><button type="button" onClick={()=>setSelectedProject(p)}>View Details</button></div></div><div className="project-card-body"><span className="project-category">{p.category}</span><h3>{p.title}</h3><p>{p.description}</p><button type="button" className="project-details-btn" onClick={()=>setSelectedProject(p)}>View Project →</button></div></article>)}</div>{selectedProject&&<div className="project-modal" onClick={()=>setSelectedProject(null)}><div className="project-modal-card" onClick={e=>e.stopPropagation()}><button className="project-modal-close" type="button" onClick={()=>setSelectedProject(null)} aria-label="Close project details">✕</button><img src={resolveImageUrl(selectedProject.image)} alt={selectedProject.title}/><div className="project-modal-body"><span className="project-category">{selectedProject.category}</span><h2>{selectedProject.title}</h2><p>{selectedProject.description||'Civil construction work executed by BSC Civil Contractor.'}</p>{selectedProject.location&&<p className="project-location">📍 {selectedProject.location}</p>}<a className="btn btn-primary" href="#contact" onClick={()=>setSelectedProject(null)}>Discuss Similar Work</a></div></div></div>}</section>
+<section id="gallery" className="section"><div className="section-head"><span>SITE GALLERY</span><h2>Actual work photographs from the company profile.</h2></div><div className="gallery-grid">{gallery.map((g,index)=><figure key={g._id} onClick={()=>setSelectedImage(index)} style={{cursor:'pointer'}}><img src={resolveImageUrl(g.image)} alt={g.title}/><figcaption><b>{g.title}</b><small>{g.category}</small></figcaption></figure>)}</div>{selectedImage!==null&&gallery[selectedImage]&&<div className="gallery-lightbox" onClick={()=>setSelectedImage(null)}><button className="lightbox-close" onClick={()=>setSelectedImage(null)} aria-label="Close gallery">✕</button><button className="lightbox-prev" onClick={e=>{e.stopPropagation();setSelectedImage(selectedImage===0?gallery.length-1:selectedImage-1)}} aria-label="Previous image">‹</button><div className="lightbox-content" onClick={e=>e.stopPropagation()}><img src={resolveImageUrl(gallery[selectedImage].image)} alt={gallery[selectedImage].title}/><div className="lightbox-caption"><strong>{gallery[selectedImage].title}</strong><span>{gallery[selectedImage].category}</span></div></div><button className="lightbox-next" onClick={e=>{e.stopPropagation();setSelectedImage(selectedImage===gallery.length-1?0:selectedImage+1)}} aria-label="Next image">›</button></div>}</section>
 <section id="testimonials" className="section tinted"><div className="section-head"><span>CLIENT TESTIMONIALS</span><h2>What our clients say about our work.</h2></div>{testimonials.length>0?<div className="testimonial-grid">{testimonials.map(t=>{const rating=Math.max(1,Math.min(5,Number(t.rating)||5));return <article className="testimonial-card" key={t._id}><div className="testimonial-rating" aria-label={`${rating} out of 5 stars`}>{'★'.repeat(rating)}</div><p>“{t.message}”</p><div className="testimonial-person"><strong>{t.name}</strong>{t.role&&<small>{t.role}</small>}</div></article>})}</div>:<div className="admin-note"><h3>No testimonials yet</h3><p>Client testimonials will appear here.</p></div>}</section>
 <section className="section qhse"><div className="section-head"><span>QHSE POLICY</span><h2>Quality, Health, Safety & Environment are integral to the business.</h2></div><div className="qhse-grid"><div><h3>Quality & compliance</h3><p>Comply with applicable legal and other requirements connected with quality, occupational health, safety and environmental matters.</p></div><div><h3>Safe working</h3><p>Use relevant technology, resource optimization, training and communication to maintain safe working and occupational health standards.</p></div><div><h3>Continuous improvement</h3><p>Continually improve QHSE performance and prevent pollution, injuries and ill health through planned objectives and targets.</p></div></div></section>
 <section id="contact" className="section contact-premium">
